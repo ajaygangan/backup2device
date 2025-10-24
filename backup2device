@@ -14,7 +14,7 @@ set -euo pipefail
 
 # VARIABLES
 # File name of the 'backed-up' archive file
-BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()').tar.gpg"
+BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()').tar"
 
 # Directories or files to 'exclude' from $HOME
 # Specify only the filename
@@ -135,7 +135,7 @@ read -p "Proceed with backup Encryption (y/n): " confirm
 if [ $confirm != "y" ]; then
     tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
     else
-	tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST"
+	tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg
 fi
 # VERIFY
 if [ $? -eq 0 ]; then
