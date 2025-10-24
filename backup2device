@@ -59,7 +59,7 @@ if [ "$choice_num" = "1" ]; then
     # Display drives in a numbered menu
     echo "Select an external drive:"
     echo "$DRIVES" | nl -s ') '
-    read -p "Choose (1,2,...) and Enter:" drive_num
+    read -p "Choose a Number and Enter:" drive_num
     # Get the selected drive's mountpoint
     DRIVE_SEL=$(echo "$DRIVES" | sed -n "${drive_num}p" | awk '{print $4}')
     # Check if the drive is mounted
@@ -68,18 +68,26 @@ if [ "$choice_num" = "1" ]; then
 	exit 1
     fi
     # Prompt for confirmation
-    read -p "Proceed with backup on $DRIVE_SEL ? (y/n): " confirm
+    read -p "Proceed with backup on $DRIVE_SEL/Backups ? (y/n): " confirm
     if [ "$confirm" != "y" ]; then
-	echo "Backup cancelled."
-	exit 0
+	read -e -p "Enter location (start from $DRIVE_SEL): " confirm_loc
+	EXTERNAL_DIR="$confirm_loc"
+	read -e -p "Proceed with backup to $EXTERNAL_DIR (y/n): " confirmy
+	if [ "$confirmy" != "y" ]; then
+	    echo "Backup cancelled."
+	    exit 0
+	fi
+    else
+	EXTERNAL_DIR="$DRIVE_SEL/Backups"
     fi
-    mkdir -p "$DRIVE_SEL"/Backups
-    DEST="$DRIVE_SEL/Backups/$BACKUP_FILE_NAME"
-# 2. MTP Phone    
+    mkdir -p "$EXTERNAL_DIR"
+    DEST="$EXTERNAL_DIR/$BACKUP_FILE_NAME"
+    # 2. MTP Phone/Device
 elif [ "$choice_num" = "2" ]; then
-    PHONE_MOUNT="/run/user/$UID/gvfs/mtp*"
-    if ! ls $PHONE_MOUNT >/dev/null 2>&1; then
-	echo "No phone mounted. Connect your Android phone via USB."
+    # Check for gvfs-mtp mountpoint
+    DEVICE_MOUNT="/run/user/$UID/gvfs/mtp*"
+    if ! ls $DEVICE_MOUNT >/dev/null 2>&1; then
+	echo "No device mounted. Connect your device via USB."
 	exit 1
     fi
     # Prompt for confirmation
@@ -88,28 +96,32 @@ elif [ "$choice_num" = "2" ]; then
 	echo "Backup cancelled."
 	exit 0
     fi
-    PHONE_STORAGE="/run/user/$UID/gvfs/$(ls -1tb /run/user/$UID/gvfs/)/Internal shared storage/Backups"
-    mkdir -p "$PHONE_STORAGE"
-    DEST="$PHONE_STORAGE/$BACKUP_FILE_NAME"
-# 3. Local
+    DEVICE_DIR="/run/user/$UID/gvfs/$(ls -1tb /run/user/$UID/gvfs/)/Internal shared storage/Backups"
+    mkdir -p "$DEVICE_DIR"
+    DEST="$DEVICE_DIR/$BACKUP_FILE_NAME"
+    # TODO; support for other mtp mountpoints;
+    # 3. Local
 elif [ "$choice_num" = "3" ]; then
-    read -p "Proceed with backup to ~/Downloads (y/n): " confirm
+    read -p "Proceed with backup to ~/Downloads/Backups (y/n): " confirm
     if [ "$confirm" != "y" ]; then
-	echo "Backup cancelled."
-	exit 0
+	read -e -p "Enter location: " confirm_loc
+	LOCAL_DIR="$confirm_loc"
+	read -p "Proceed with backup to $LOCAL_DIR (y/n): " confirmy
+	if [ "$confirmy" != "y" ]; then
+	    echo "Backup cancelled."
+	    exit 0
+	fi
+    else
+	LOCAL_DIR="$HOME/Downloads/Backups"
     fi
-    LOCAL_STORAGE="~/Downloads/Backups"
-    mkdir -p "$LOCAL_STORAGE"
-    DEST="$LOCAL_STORAGE/$BACKUP_FILE_NAME"
+    mkdir -p "$LOCAL_DIR"
+    DEST="$LOCAL_DIR/$BACKUP_FILE_NAME"
 else
     echo "Invalid choice"
     exit 1
 fi
-#
-# Functions for appending directories or files
 
-
-to exclude to tar cmd
+# Functions for appending dirs mentioned in EXCLUDE_FLAGS and INCLUDE_FLAGS to tar cmd
 EXCLUDE_FLAGS=()
 for dir in "${EXCLUDE_DIRS[@]}"; do
     EXCLUDE_FLAGS+=("--exclude=$dir")
