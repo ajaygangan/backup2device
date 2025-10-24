@@ -13,15 +13,15 @@
 set -euo pipefail
 
 # VARIABLES
-# File name of the backed-up archive file
+# File name of the 'backed-up' archive file
 BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()').tar.gpg"
 
-# Directories or files to exclude from $HOME
+# Directories or files to 'exclude' from $HOME
 # Specify only the filename
 # eg; (".cache" "Desktop" "Downloads" "Music" "Videos")
-EXCLUDE_DIRS=(".cache" "Desktop" "Downloads" ".emacs.d" "Music" "Projects" "Public" "Templates" ".texlive*" "Videos")
+EXCLUDE_DIRS=()
 
-# Directories or files to include other than from $HOME
+# Directories or files to 'include' other than from $HOME
 # Specify the full filename i.e., including the path
 # eg; ("/etc" "/usr/local/share")
 INCLUDE_DIRS=()
@@ -33,11 +33,20 @@ INCLUDE_DIRS=()
 # -f - output file
 TAR_OPTIONS="-czpf"
 
+# WARN
+[ -z "$TAR_OPTIONS" ] && echo "ERROR: TAR_OPTIONS is empty in the script; fatal!"
+[ ${#INCLUDE_DIRS[@]} -eq 0 ] && echo "Warning: INCLUDE_DIRS is empty in the script; not fatal!"
+[ ${#EXCLUDE_DIRS[@]} -eq 0 ] && echo "Warning: EXCLUDE_DIRS is empty in the script; not fatal!"
+DEPENDENCIES=(tar gpg ls lsblk nl read echo mkdir)
+for dep in "${DEPENDENCIES[@]}"; do
+    command -v "$dep" &> /dev/null || { echo "Error: $dep is not installed. Please install it to continue."; exit 1; }
+done
+
 # FUNCTIONS
 # First prompt
 echo "Backup to:"
-echo -e "External drive\nMTP Phone\nLocal" | nl -s ') '
-read -p "Choose (1,2,3) and Enter:" choice_num
+echo -e "External drive\nMTP Phone/Device\nLocal" | nl -s ') '
+read -p "Choose a Number and Enter:" choice_num
 # 1. External drive
 if [ "$choice_num" = "1" ]; then
     # Get a list of external drives (excluding internal drives and loop devices)
