@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+
+# Script: backup2device.sh
+# Author: Ajay G
+# Version: 1.0
+# Description: Script for backing-up $HOME or specified dirs to external devices/drives or to local dirs.
+
+# ERROR HANDLING
+# -e (errexit) - Exit immediately if any command returns a non-zero status
+# -u (nounset) - Treat unset variables as errors and exit immediately
+# -x (xtrace) - Print commands and their arguments as they are executed
+# -o pipefail - Pipeline returns the exit status of the last command to fail, or zero if all succeed
+set -euo pipefail
+
+# VARIABLES
+# File name of the backed-up archive file
+BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()').tar.gpg"
+
+# Directories or files to exclude from $HOME
+# Specify only the filename
+# eg; (".cache" "Desktop" "Downloads" "Music" "Videos")
+EXCLUDE_DIRS=(".cache" "Desktop" "Downloads" ".emacs.d" "Music" "Projects" "Public" "Templates" ".texlive*" "Videos")
+
+# Directories or files to include other than from $HOME
+# Specify the full filename i.e., including the path
+# eg; ("/etc" "/usr/local/share")
+INCLUDE_DIRS=()
+
+# Options for tar
+# -c - create archive
+# -z - use gzip / -J - use xz
+# -p - preserve permissions
+# -f - output file
+TAR_OPTIONS="-czpf"
+
+# FUNCTIONS
+# First prompt
+echo "Backup to:"
+echo -e "External drive\nMTP Phone\nLocal" | nl -s ') '
+read -p "Choose (1,2,3) and Enter:" choice_num
+# 1. External drive
+if [ "$choice_num" = "1" ]; then
+    # Get a list of external drives (excluding internal drives and loop devices)
+    DRIVES=$(lsblk -d -o NAME,FSTYPE,SIZE,MOUNTPOINT -e 7,1 | awk '$1 ~ /^sd/ && $4 != "/" {print $0}')
+    # Check if any drives are found
+    if [ -z "$DRIVES" ]; then
+	echo "No external drives found."
+	exit 1
+    fi
+    # Display drives in a numbered menu
+    echo "Select an external drive:"
+    echo "$DRIVES" | nl -s ') '
+    read -p "Choose (1,2,...) and Enter:" drive_num
+    # Get the selected drive's mountpoint
+    DRIVE_SEL=$(echo "$DRIVES" | sed -n "${drive_num}p" | awk '{print $4}')
+    # Check if the drive is mounted
+    if [ -z "$DRIVE_SEL" ]; then
+	echo "Please mount the Drive and try again!"
+	exit 1
+    fi
+    # Prompt for confirmation
+    read -p "Proceed with backup on $DRIVE_SEL ? (y/n): " confirm
+    if [ "$confirm" != "y" ]; then
+	echo "Backup cancelled."
+	exit 0
+    fi
+    mkdir -p "$DRIVE_SEL"/Backups
+    DEST="$DRIVE_SEL/Backups/$BACKUP_FILE_NAME"
+# 2. MTP Phone    
+elif [ "$choice_num" = "2" ]; then
+    PHONE_MOUNT="/run/user/$UID/gvfs/mtp*"
+    if ! ls $PHONE_MOUNT >/dev/null 2>&1; then
+	echo "No phone mounted. Connect your Android phone via USB."
+	exit 1
+    fi
+    # Prompt for confirmation
+    read -p "$(ls -1t /run/user/$UID/gvfs/) detected. Proceed with backup? (y/n): " confirm
+    if [ "$confirm" != "y" ]; then
+	echo "Backup cancelled."
+	exit 0
+    fi
+    PHONE_STORAGE="/run/user/$UID/gvfs/$(ls -1tb /run/user/$UID/gvfs/)/Internal shared storage/Backups"
+    mkdir -p "$PHONE_STORAGE"
+    DEST="$PHONE_STORAGE/$BACKUP_FILE_NAME"
+# 3. Local
+elif [ "$choice_num" = "3" ]; then
+    read -p "Proceed with backup to ~/Downloads (y/n): " confirm
+    if [ "$confirm" != "y" ]; then
+	echo "Backup cancelled."
+	exit 0
+    fi
+    LOCAL_STORAGE="~/Downloads/Backups"
+    mkdir -p "$LOCAL_STORAGE"
+    DEST="$LOCAL_STORAGE/$BACKUP_FILE_NAME"
+else
+    echo "Invalid choice"
+    exit 1
+fi
+#
+# Functions for appending directories or files
+
+
+to exclude to tar cmd
+EXCLUDE_FLAGS=()
+for dir in "${EXCLUDE_DIRS[@]}"; do
+    EXCLUDE_FLAGS+=("--exclude=$dir")
+done
+INCLUDE_FLAGS=()
+for dir in "${INCLUDE_DIRS[@]}"; do
+    INCLUDE_FLAGS+=("$dir")
+done
+# To write tar archive directly to destination
+tar $options - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST"
+
+# VERIFY
+if [ $? -eq 0 ]; then
+    echo "Backup successfully created at $DEST"
+else
+    echo "Failed to create backup at $DEST"
+    exit 1
+fi
