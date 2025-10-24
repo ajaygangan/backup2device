@@ -131,8 +131,12 @@ for dir in "${INCLUDE_DIRS[@]}"; do
     INCLUDE_FLAGS+=("$dir")
 done
 # To write tar archive directly to destination
-tar $options - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST"
-
+read -p "Proceed with backup Encryption (y/n): " confirm
+if [ $confirm != "y" ]; then
+    tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
+    else
+	tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST"
+fi
 # VERIFY
 if [ $? -eq 0 ]; then
     echo "Backup successfully created at $DEST"
