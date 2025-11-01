@@ -2,14 +2,13 @@
 
 # Script: backup2device.sh
 # Author: Ajay G
-# Version: 1.0
 # Description: Script for backing-up $HOME or specified dirs to external devices/drives or to local dirs.
 
 # ERROR HANDLING
-# -e (errexit) - Exit immediately if any command returns a non-zero status
-# -u (nounset) - Treat unset variables as errors and exit immediately
-# -x (xtrace) - Print commands and their arguments as they are executed
-# -o pipefail - Pipeline returns the exit status of the last command to fail, or zero if all succeed
+# -e : (errexit) Exit immediately if any command returns a non-zero status
+# -u : (nounset) Treat unset variables as errors and exit immediately
+# -x : (xtrace) Print commands and their arguments as they are executed
+# -o pipefail : Pipeline returns the exit status of the last command to fail, or zero if all succeed
 set -euo pipefail
 
 # VARIABLES
@@ -19,7 +18,7 @@ BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | gr
 # Directories or files to 'exclude' from $HOME
 # Specify only the filename
 # eg; (".cache" "Desktop" "Downloads" "Music" "Videos")
-EXCLUDE_DIRS=()
+EXCLUDE_DIRS=("*")
 
 # Directories or files to 'include' other than from $HOME
 # Specify the full filename i.e., including the path
@@ -35,7 +34,6 @@ TAR_OPTIONS="-czpf"
 
 # WARN
 [ -z "$TAR_OPTIONS" ] && echo "ERROR: TAR_OPTIONS is empty in the script; fatal!"
-[ ${#INCLUDE_DIRS[@]} -eq 0 ] && echo "Warning: INCLUDE_DIRS is empty in the script; not fatal!"
 [ ${#EXCLUDE_DIRS[@]} -eq 0 ] && echo "Warning: EXCLUDE_DIRS is empty in the script; not fatal!"
 DEPENDENCIES=(tar gpg ls lsblk nl read echo mkdir)
 for dep in "${DEPENDENCIES[@]}"; do
@@ -134,8 +132,8 @@ done
 read -p "Proceed with backup Encryption (y/n): " confirm
 if [ $confirm != "y" ]; then
     tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
-    else
-	tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg
+else
+    tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg
 fi
 # VERIFY
 if [ $? -eq 0 ]; then
