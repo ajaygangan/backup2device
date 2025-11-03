@@ -25,7 +25,7 @@ INCLUDE_DIRS=()
 # -z : use gzip / -J : use xz (Remember to add .gz or .xz to BACKUP_FILE_NAME)
 # -p : preserve permissions
 # keep -c at the beginning and -f at the end
-TAR_OPTIONS="-czf"
+TAR_OPTIONS="-cvzf"
 
 # DEFINE COLORS
 RED='\033[0;31m'
@@ -34,8 +34,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 RESET='\033[0m' # No Color
 # WARN
-[ -z "$TAR_OPTIONS" ] && echo -e "${RED}ERROR: TAR_OPTIONS is empty in the script; fatal!${RESET}"
+[ -z "$TAR_OPTIONS" ] && echo -e "${RED}Error: TAR_OPTIONS is empty in the script; fatal!${RESET}"
 [ ${#EXCLUDE_DIRS[@]} -eq 0 ] && echo "${YELLOW}Warning: EXCLUDE_DIRS is empty in the script; not fatal!${RESET}"
+[ "$PWD" != "$HOME" ] && echo -e "${RED}Warning: You are not in your home directory!${RESET}"
 DEPENDENCIES=(tar gpg ls lsblk nl read echo mkdir)
 for dep in "${DEPENDENCIES[@]}"; do
     command -v "$dep" &> /dev/null || { echo "${RED}Error: $dep is not installed. Please install it to continue.${RESET}"; exit 1; }
@@ -138,30 +139,32 @@ done
 # To write tar archive directly to destination
 read -p "$(echo -e "${BLUE}Proceed with backup Encryption (y/n): ${RESET}")" confirm
 if [ "$confirm" != "y" ]; then
-    tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . &
     MESSAGE="Run '$ tar "${TAR_OPTIONS/c/x}" <backup>.tar.gz' to extract!"
+    tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
 else
-    tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg &
     MESSAGE="Run '$ gpg -d <backup>.tar.gz | tar "${TAR_OPTIONS/c/x}" -' to extract!"
+    tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg
 fi
-pid=$!
-echo "Press 'C-c' to cancel"
-cancel_fun() {
-    kill $pid 2>/dev/null
-    echo -e "${RED}Backup cancelled.${RESET}"
-    exit 0
-}
-trap cancel_fun SIGINT SIGTERM EXIT
+#pid=$!
+#echo "Press 'C-c' to cancel"
+#cancel_fun() {
+#    kill $pid 2>/dev/null
+#    echo -e "${RED}Backup cancelled.${RESET}"
+#    exit 0
+#}
+#trap cancel_fun SIGINT SIGTERM EXIT
 # Display size metrics while process is running
-TOTALSIZE="$(du -sh "${EXCLUDE_FLAGS[@]}" "$HOME")"
-while kill -0 "$pid" 2>/dev/null; do
-    printf '\rBacking up %s - Current archive size %s' "$TOTALSIZE" "$(du -sh $DEST | awk '{print$1}')"
-    sleep 1
-done
+#TOTALSIZE="$(du -sh "${EXCLUDE_FLAGS[@]}" "$HOME")"
+#while kill -0 "$pid" 2>/dev/null; do
+#    printf '\rBacking up %s - Current archive size %s' "$TOTALSIZE" "$(du -sh $DEST | awk '{print$1}')"
+#    sleep 1
+#done
+
 # VERIFY
-wait $pid
+#wait $pid
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Backup successfully created at $DEST${RESET}"
+    printf 'Backed up archive size is %s' "$(du -sh $DEST | awk '{print$1}')"
     echo -e "${YELLOW}$MESSAGE${RESET}"
     exit 0
 else
