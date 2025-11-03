@@ -116,12 +116,15 @@ elif [ "$CHOICE" = "$LOCAL" ]; then
 	    echo -e "${RED}Backup cancelled.${RESET}"
 	    exit 0
 	fi
+	mkdir -p "$LOCAL_DIR"
+	DEST="$LOCAL_DIR/$BACKUP_FILE_NAME"
     else
-	LOCAL_DIR="$HOME/Downloads/Backups"
+	LOCAL_DIR="Downloads/Backups"
+	mkdir -p "$HOME/$LOCAL_DIR"
+	DEST="$HOME/$LOCAL_DIR/$BACKUP_FILE_NAME"
     fi
-    mkdir -p "$LOCAL_DIR"
+# EXCLUDE_DIRS shouldn't be absolute paths starting from /, conflifcts with '-C $Home' flag in tar cmd
     EXCLUDE_DIRS+=("$LOCAL_DIR")
-    DEST="$LOCAL_DIR/$BACKUP_FILE_NAME"    
 else
     echo -e "${RED}Invalid response: ${RESET}$CHOICE"
     exit 1
