@@ -36,8 +36,7 @@ RESET='\033[0m' # No Color
 # WARN
 [ -z "$TAR_OPTIONS" ] && echo -e "${RED}Error: TAR_OPTIONS is empty in the script; fatal!${RESET}"
 [ ${#EXCLUDE_DIRS[@]} -eq 0 ] && echo "${YELLOW}Warning: EXCLUDE_DIRS is empty in the script; not fatal!${RESET}"
-[ "$PWD" != "$HOME" ] && echo -e "${RED}Warning: You are not in your home directory!${RESET}"
-DEPENDENCIES=(tar gpg ls lsblk nl read echo mkdir)
+DEPENDENCIES=(date hostname cat cut tr lsblk df nl sed grep ls mkdir tar gpg du awk)
 for dep in "${DEPENDENCIES[@]}"; do
     command -v "$dep" &> /dev/null || { echo "${RED}Error: $dep is not installed. Please install it to continue.${RESET}"; exit 1; }
 done
@@ -140,13 +139,17 @@ for dir in "${INCLUDE_DIRS[@]}"; do
     INCLUDE_FLAGS+=("$dir")
 done
 # To write tar archive directly to destination
+# Total size of $HOME excluding mentioned dirs in $EXCLUDE_DIRS
+INITIALSIZE="$(du -sh "${EXCLUDE_FLAGS[@]}" "$HOME")"
+echo -e "Backing up ${YELLOW}$INITIALSIZE${RESET} ${EXCLUDE_FLAGS[@]}"
 read -p "$(echo -e "${BLUE}Proceed with backup Encryption (y/n): ${RESET}")" confirm
 if [ "$confirm" != "y" ]; then
     MESSAGE="Run '$ tar "${TAR_OPTIONS/c/x}" <backup>.tar.gz' to extract!"
     tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
 else
     MESSAGE="Run '$ gpg -d <backup>.tar.gz | tar "${TAR_OPTIONS/c/x}" -' to extract!"
-    tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST".gpg
+    DEST=""$DEST".gpg"
+    tar $TAR_OPTIONS - "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" . | gpg --symmetric -o "$DEST"
 fi
 #pid=$!
 #echo "Press 'C-c' to cancel"
@@ -165,12 +168,13 @@ fi
 
 # VERIFY
 #wait $pid
+FINALSIZE="$(du -sh $DEST | awk '{print$1}' 2>/dev/null)"
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Backup successfully created at $DEST${RESET}"
-    printf 'Backed up archive size is %s' "$(du -sh $DEST | awk '{print$1}')"
-    echo -e "${YELLOW}$MESSAGE${RESET}"
+    echo -e "Backup successfully created at ${GREEN}"$DEST"${RESET}"
+    echo -e "Backed up archive size is ${GREEN}"$FINALSIZE"${RESET}"
+    echo -e "${YELLOW}"$MESSAGE"${RESET}"
     exit 0
 else
-    echo -e "${RED}Failed to create backup at $DEST${RESET}"
+    echo -e "${RED}Failed to create backup at "$DEST"${RESET}"
     exit 1
 fi
