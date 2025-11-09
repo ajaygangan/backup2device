@@ -3,13 +3,14 @@
 # Script: backup2device.sh
 # Author: Ajay G
 # Description: A flexible script to back up the $HOME directory or user-specified directories to an external drive/mtp-device or a local backup directory.
+# TODO; -include -exclude -help -extract flags
 
 # ERROR HANDLING
 set -euo pipefail
 
 # IMPORTANT VARIABLES
 # File name of the 'backed-up' archive file
-BACKUP_FILE_NAME="$(date +%Y%m%dT%H%M%S)--$(hostname)__$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()').tar.gz"
+BACKUP_FILE_NAME="$(cat /etc/*-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '" ()')-$(hostname)-$(date +%Y%m%dT%H%M%S).tar.gz"
 
 # Directories or files to 'exclude' from $HOME
 # Specify only the filename
@@ -20,12 +21,14 @@ EXCLUDE_DIRS=(".cache")
 # Specify the full filename i.e., including the path
 # eg; ("/etc" "/usr/local/share")
 INCLUDE_DIRS=()
+# TODO; separate options for home and root dirs backups (separate tar cmd)
 
 # Options for tar
 # -z : use gzip / -J : use xz (Remember to add .gz or .xz to BACKUP_FILE_NAME)
 # -p : preserve permissions
 # keep -c at the beginning and -f at the end
 TAR_OPTIONS="-cvzf"
+# TODO; more archive choices
 
 # DEFINE COLORS
 RED='\033[0;31m'
@@ -43,18 +46,22 @@ done
 
 # Get a list of external drives (excluding internal drives and loop devices)
 DRIVES=$(lsblk -d -o NAME,FSTYPE,SIZE,MOUNTPOINT -e 7,1 | awk '$1 ~ /^sd/ && $4 != "/" {print $0}')
-# Get a list of gvfs-mtp mounted devices
-# TODO; support for other mtp mountpoints;
-MTP_DEVICES=$(ls -1t /run/user/$UID/gvfs/)
-# Local format
-LOCAL="Local $(df -h --output=avail $HOME | sed -n '2p') $HOME"
-# Check if any drives or mtp-devices are found
 if [ -z "$DRIVES" ]; then
     DRIVES="No External Drives found!"
 fi
-if [ -z "$MTP_DEVICES" ]; then
+# Get a list of gvfs-mtp mounted devices
+# TODO; support for other mtp mountpoints;
+if [ -d "/run/user/$UID/gvfs/" ]; then
+    MTP_DEVICES=$(ls -1t /run/user/$UID/gvfs/)
+    if [ -z "$MTP_DEVICES" ]; then
+	MTP_DEVICES="No MTP-Devices/Phones found!"
+    fi
+else
     MTP_DEVICES="No MTP-Devices/Phones found!"
 fi
+# Local format
+LOCAL="Local $(df -h --output=avail $HOME | sed -n '2p') $HOME"
+
 # First prompt
 # Display drives or mtp-devices in a numbered menu
 echo "Where to backup:"
@@ -122,8 +129,9 @@ elif [ "$CHOICE" = "$LOCAL" ]; then
 	mkdir -p "$HOME/$LOCAL_DIR"
 	DEST="$HOME/$LOCAL_DIR/$BACKUP_FILE_NAME"
     fi
-# EXCLUDE_DIRS shouldn't be absolute paths starting from /, conflifcts with '-C $Home' flag in tar cmd
+    # EXCLUDE_DIRS shouldn't be absolute paths starting from /, conflifcts with '-C $Home' flag in tar cmd
     EXCLUDE_DIRS+=("$LOCAL_DIR")
+    # TODO; remember local backup location for auto exlution with mtp/external
 else
     echo -e "${RED}Invalid response: ${RESET}$CHOICE"
     exit 1
@@ -143,6 +151,7 @@ done
 INITIALSIZE="$(du -sh "${EXCLUDE_FLAGS[@]}" "$HOME")"
 echo -e "Backing up ${YELLOW}$INITIALSIZE${RESET} ${EXCLUDE_FLAGS[@]}"
 read -p "$(echo -e "${BLUE}Proceed with backup Encryption (y/n): ${RESET}")" confirm
+# TODO; prompt for pinentry in terminal
 if [ "$confirm" != "y" ]; then
     MESSAGE="Run '$ tar "${TAR_OPTIONS/c/x}" <backup>.tar.gz' to extract!"
     tar $TAR_OPTIONS "$DEST" "${INCLUDE_FLAGS[@]}" -C "$HOME" "${EXCLUDE_FLAGS[@]}" .
@@ -162,13 +171,13 @@ fi
 # Display size metrics while process is running
 #TOTALSIZE="$(du -sh "${EXCLUDE_FLAGS[@]}" "$HOME")"
 #while kill -0 "$pid" 2>/dev/null; do
-#    printf '\rBacking up %s - Current archive size %s' "$TOTALSIZE" "$(du -sh $DEST | awk '{print$1}')"
+#    printf '\rBacking up %s - Current archive size %s' "$TOTALSIZE" "$(du -sh "$DEST" | awk '{print$1}')"
 #    sleep 1
 #done
 
 # VERIFY
 #wait $pid
-FINALSIZE="$(du -sh $DEST | awk '{print$1}' 2>/dev/null)"
+FINALSIZE="$(du -sh "$DEST" | awk '{print$1}' 2>/dev/null)"
 if [ $? -eq 0 ]; then
     echo -e "Backup successfully created at ${GREEN}"$DEST"${RESET}"
     echo -e "Backed up archive size is ${GREEN}"$FINALSIZE"${RESET}"
